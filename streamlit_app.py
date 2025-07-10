@@ -1,132 +1,124 @@
 import streamlit as st
 import numpy as np
-import time
-from PIL import Image, ImageDraw
 import random
 
 # ゲームの設定
-CAR_WIDTH = 20  # 車の幅
-CAR_HEIGHT = 40  # 車の高さ
-TRACK_WIDTH = 200  # トラックの幅
-TRACK_HEIGHT = 600  # トラックの高さ
-OBSTACLE_WIDTH = 30  # 障害物の幅
-OBSTACLE_HEIGHT = 30  # 障害物の高さ
+GRID_SIZE = 10  # グリッドのサイズ（10x10）
+NUM_MINES = 15  # 爆弾の数
 
 # 初期化
-if 'car_pos' not in st.session_state:
-    st.session_state.car_pos = [TRACK_WIDTH // 2 - CAR_WIDTH // 2, TRACK_HEIGHT - CAR_HEIGHT - 10]  # 車の初期位置
-if 'score' not in st.session_state:
-    st.session_state.score = 0  # スコア
-if 'obstacles' not in st.session_state:
-    st.session_state.obstacles = []  # 障害物のリスト
-if 'game_over' not in st.session_state:
-    st.session_state.game_over = False
+if 'game_board' not in st.session_state:
+    st.session_state.game_board = np.zeros((GRID_SIZE, GRID_SIZE), dtype=int)  # ボードの初期化（0: 非爆弾、1: 爆弾）
+    st.session_state.revealed = np.zeros((GRID_SIZE, GRID_SIZE), dtype=bool)  # セルの開かれている状態
+    st.session_state.mines = set()  # 爆弾の位置
+    st.session_state.game_over = False  # ゲームオーバー状態
+    st.session_state.win = False  # 勝利状態
+    st.session_state.flags = set()  # フラグを立てた位置
 
-# 車の描画
-def draw_car(draw, car_pos):
-    draw.rectangle([car_pos[0], car_pos[1], car_pos[0] + CAR_WIDTH, car_pos[1] + CAR_HEIGHT], fill="blue")
+# 爆弾をランダムに配置する関数
+def place_mines():
+    while len(st.session_state.mines) < NUM_MINES:
+        x, y = random.randint(0, GRID_SIZE-1), random.randint(0, GRID_SIZE-1)
+        st.session_state.mines.add((x, y))
+        st.session_state.game_board[x, y] = -1  # -1を爆弾の位置に設定
+    
+    # 各セルに隣接する爆弾の数をカウントする
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            if st.session_state.game_board[x, y] == -1:
+                continue  # 爆弾があるセルはスキップ
+            # 8方向をチェック
+            mine_count = 0
+            for i in range(-1, 2):
+                for j in range(-1, 2):
+                    nx, ny = x + i, y + j
+                    if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE:
+                        if st.session_state.game_board[nx, ny] == -1:
+                            mine_count += 1
+            st.session_state.game_board[x, y] = mine_count
 
-# 障害物の描画
-def draw_obstacles(draw, obstacles):
-    for obs in obstacles:
-        draw.rectangle([obs[0], obs[1], obs[0] + OBSTACLE_WIDTH, obs[1] + OBSTACLE_HEIGHT], fill="red")
-
-# 障害物の移動
-def move_obstacles():
-    # 障害物を移動させる
-    new_obstacles = []
-    for obs in st.session_state.obstacles:
-        if obs[1] < TRACK_HEIGHT:
-            new_obstacles.append([obs[0], obs[1] + 5])
-    
-    # 新しい障害物を追加
-    if random.random() < 0.05:
-        new_x = random.randint(0, TRACK_WIDTH - OBSTACLE_WIDTH)
-        new_obstacles.append([new_x, 0])
-    
-    st.session_state.obstacles = new_obstacles
-
-# 衝突判定
-def check_collision():
-    car_pos = st.session_state.car_pos
-    for obs in st.session_state.obstacles:
-        if (car_pos[0] < obs[0] + OBSTACLE_WIDTH and
-            car_pos[0] + CAR_WIDTH > obs[0] and
-            car_pos[1] < obs[1] + OBSTACLE_HEIGHT and
-            car_pos[1] + CAR_HEIGHT > obs[1]):
-            return True
-    return False
-
-# 車の移動
-def move_car(direction):
-    if direction == 'left':
-        st.session_state.car_pos[0] = max(0, st.session_state.car_pos[0] - 10)
-    elif direction == 'right':
-        st.session_state.car_pos[0] = min(TRACK_WIDTH - CAR_WIDTH, st.session_state.car_pos[0] + 10)
-
-# ゲーム画面の描画
-def draw_game():
-    # 画面の作成
-    image = Image.new('RGB', (TRACK_WIDTH, TRACK_HEIGHT), (0, 0, 0))  # 黒い背景
-    draw = ImageDraw.Draw(image)
-    
-    # トラックの中央線
-    draw.line([TRACK_WIDTH // 2, 0, TRACK_WIDTH // 2, TRACK_HEIGHT], fill="white", width=2)
-    
-    # 車を描画
-    draw_car(draw, st.session_state.car_pos)
-    
-    # 障害物を描画
-    draw_obstacles(draw, st.session_state.obstacles)
-    
-    return image
-
-# ゲームの進行
-def game_loop():
-    if st.session_state.game_over:
-        st.write("ゲームオーバー！")
-        st.write(f"スコア: {st.session_state.score}")
-        if st.button("再スタート"):
-            st.session_state.car_pos = [TRACK_WIDTH // 2 - CAR_WIDTH // 2, TRACK_HEIGHT - CAR_HEIGHT - 10]
-            st.session_state.score = 0
-            st.session_state.obstacles = []
-            st.session_state.game_over = False
-        return
-    
-    # ゲームの描画
-    image = draw_game()
-    st.image(image, caption="レースゲーム", use_column_width=True)
-    
-    # 車の移動処理
-    direction = None
-    if st.button("左"):
-        direction = 'left'
-    elif st.button("右"):
-        direction = 'right'
-    
-    if direction:
-        move_car(direction)
-    
-    # 障害物の移動
-    move_obstacles()
-    
-    # 衝突チェック
-    if check_collision():
+# セルを開ける関数
+def reveal_cell(x, y):
+    if (x, y) in st.session_state.flags:
+        return  # フラグが立てられている場合は何もしない
+    if st.session_state.game_board[x, y] == -1:  # 爆弾を踏んだ
         st.session_state.game_over = True
         return
-    
-    # スコア更新
-    st.session_state.score += 1
-    st.write(f"スコア: {st.session_state.score}")
-    
-    # ゲームの進行
-    time.sleep(0.1)
+    st.session_state.revealed[x, y] = True
+    # 0のセルの場合、周囲のセルを再帰的に開ける
+    if st.session_state.game_board[x, y] == 0:
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                nx, ny = x + i, y + j
+                if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE and not st.session_state.revealed[nx, ny]:
+                    reveal_cell(nx, ny)
 
-# ゲームの開始
-def start_game():
-    st.title("レースゲーム")
-    game_loop()
+# フラグを置く
+def toggle_flag(x, y):
+    if st.session_state.revealed[x, y]:  # 既に開かれているセルにはフラグを立てられない
+        return
+    if (x, y) in st.session_state.flags:
+        st.session_state.flags.remove((x, y))
+    else:
+        st.session_state.flags.add((x, y))
 
-# 実行
+# 勝利判定
+def check_win():
+    # 開かれたセルが非爆弾セルのみの場合、勝利
+    unrevealed_non_mine = 0
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            if not st.session_state.revealed[x, y] and (x, y) not in st.session_state.mines:
+                unrevealed_non_mine += 1
+    if unrevealed_non_mine == 0:
+        st.session_state.win = True
+        st.session_state.game_over = True
+
+# ゲームの描画
+def draw_game():
+    for x in range(GRID_SIZE):
+        for y in range(GRID_SIZE):
+            if st.session_state.revealed[x, y]:
+                if st.session_state.game_board[x, y] == -1:
+                    st.write(f"💣", end=" ")
+                else:
+                    st.write(f"{st.session_state.game_board[x, y]}", end=" ")
+            else:
+                if (x, y) in st.session_state.flags:
+                    st.write(f"🚩", end=" ")  # フラグを立てた場所
+                else:
+                    st.write(f"■", end=" ")  # 隠されたセル
+        st.write()
+
+# ゲームの進行
+def play_game():
+    st.title("マインスイーパ")
+
+    if not st.session_state.mines:
+        place_mines()
+
+    if st.session_state.game_over:
+        if st.session_state.win:
+            st.write("おめでとうございます！あなたの勝ちです！")
+        else:
+            st.write("ゲームオーバー！爆弾を踏みました。")
+        return
+
+    # ゲームボードの表示
+    draw_game()
+
+    # ユーザーの操作
+    action = st.radio("アクションを選択", ["セルを開く", "フラグを置く"])
+    x = st.number_input("x座標（0〜9）", min_value=0, max_value=GRID_SIZE-1)
+    y = st.number_input("y座標（0〜9）", min_value=0, max_value=GRID_SIZE-1)
+
+    if action == "セルを開く":
+        reveal_cell(x, y)
+    elif action == "フラグを置く":
+        toggle_flag(x, y)
+
+    check_win()
+
+# ゲーム開始
 if __name__ == "__main__":
-    start_game()
+    play_game()
