@@ -1,73 +1,120 @@
 import streamlit as st
-import random
-from collections import Counter
+import numpy as np
+import time
+from PIL import Image, ImageDraw
 
-# カードの定義
-suits = ['♠', '♥', '♦', '♣']
-ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+# ゲームの設定
+GRID_SIZE = 10  # グリッドのサイズ（10x10）
+PACMAN_COLOR = (255, 255, 0)  # パックマンの色（黄色）
+GHOST_COLOR = (255, 0, 0)    # ゴーストの色（赤）
 
-# カードのデッキを作成
-def create_deck():
-    return [f'{rank}{suit}' for rank in ranks for suit in suits]
+# 初期化
+if 'score' not in st.session_state:
+    st.session_state.score = 0
+if 'pacman_pos' not in st.session_state:
+    st.session_state.pacman_pos = [5, 5]  # パックマンの初期位置
+if 'game_over' not in st.session_state:
+    st.session_state.game_over = False
 
-# カードをシャッフルして引く
-def shuffle_and_deal(deck):
-    random.shuffle(deck)
-    return deck[:5], deck[5:10]  # プレイヤーとコンピュータの手札を5枚ずつ配る
-
-# 手札を評価する関数
-def evaluate_hand(hand):
-    # ランクとスートを分ける
-    ranks_in_hand = [card[:-1] for card in hand]
-    suits_in_hand = [card[-1] for card in hand]
-
-    rank_counts = Counter(ranks_in_hand)
-    is_flush = len(set(suits_in_hand)) == 1
-    is_straight = len(rank_counts) == 5 and (ranks_in_hand.index(max(ranks_in_hand, key=lambda x: ranks.index(x))) - ranks_in_hand.index(min(ranks_in_hand, key=lambda x: ranks.index(x))) == 4)
+# ゲームフィールドの描画
+def draw_game():
+    # ゲームボードのサイズ
+    width, height = 400, 400
+    grid = Image.new('RGB', (width, height), (0, 0, 0))  # 黒い背景
+    draw = ImageDraw.Draw(grid)
     
-    return {
-        'ranks_in_hand': ranks_in_hand,
-        'is_flush': is_flush,
-        'is_straight': is_straight
-    }
-
-# ゲームの状態をリセットするための関数
-def reset_game():
-    deck = create_deck()
-    player_hand, computer_hand = shuffle_and_deal(deck)
-    return player_hand, computer_hand
-
-# ポーカーハンドを評価して勝者を決定
-def determine_winner(player_hand, computer_hand):
-    player_score = evaluate_hand(player_hand)
-    computer_score = evaluate_hand(computer_hand)
+    # グリッド線の描画
+    for i in range(0, width, width // GRID_SIZE):
+        draw.line([(i, 0), (i, height)], fill=(255, 255, 255))
+    for i in range(0, height, height // GRID_SIZE):
+        draw.line([(0, i), (width, i)], fill=(255, 255, 255))
     
-    # フラッシュとストレートを判定
-    player_strength = (player_score['is_flush'], player_score['is_straight'])
-    computer_strength = (computer_score['is_flush'], computer_score['is_straight'])
+    # パックマンの描画
+    pacman_x = st.session_state.pacman_pos[0] * (width // GRID_SIZE) + (width // GRID_SIZE) // 2
+    pacman_y = st.session_state.pacman_pos[1] * (height // GRID_SIZE) + (height // GRID_SIZE) // 2
+    draw.ellipse(
+        [(pacman_x - 10, pacman_y - 10), (pacman_x + 10, pacman_y + 10)],
+        fill=PACMAN_COLOR
+    )
+
+    # ゴースト（簡易的に1体）の描画
+    ghost_x = 3 * (width // GRID_SIZE) + (width // GRID_SIZE) // 2
+    ghost_y = 3 * (height // GRID_SIZE) + (height // GRID_SIZE) // 2
+    draw.ellipse(
+        [(ghost_x - 10, ghost_y - 10), (ghost_x + 10, ghost_y + 10)],
+        fill=GHOST_COLOR
+    )
     
-    if player_strength > computer_strength:
-        return 'プレイヤーの勝ち！'
-    elif player_strength < computer_strength:
-        return 'コンピュータの勝ち！'
-    else:
-        return '引き分け！'
+    return grid
 
-# メインUIの作成
-def poker_game():
-    st.title("ポーカーゲーム")
+# ゲームオーバー処理
+def check_collision():
+    pacman_pos = st.session_state.pacman_pos
+    ghost_pos = [3, 3]  # ゴーストの固定位置
+    if pacman_pos == ghost_pos:
+        st.session_state.game_over = True
+        return True
+    return False
 
-    if 'player_hand' not in st.session_state:
-        st.session_state.player_hand, st.session_state.computer_hand = reset_game()
+# ユーザー入力（パックマンの移動）
+def move_pacman(direction):
+    if st.session_state.game_over:
+        return
 
-    st.write("プレイヤーの手札: ", ', '.join(st.session_state.player_hand))
-    st.write("コンピュータの手札: ", ', '.join(st.session_state.computer_hand))
+    if direction == 'up':
+        st.session_state.pacman_pos[1] = max(0, st.session_state.pacman_pos[1] - 1)
+    elif direction == 'down':
+        st.session_state.pacman_pos[1] = min(GRID_SIZE - 1, st.session_state.pacman_pos[1] + 1)
+    elif direction == 'left':
+        st.session_state.pacman_pos[0] = max(0, st.session_state.pacman_pos[0] - 1)
+    elif direction == 'right':
+        st.session_state.pacman_pos[0] = min(GRID_SIZE - 1, st.session_state.pacman_pos[0] + 1)
 
-    if st.button("ゲーム開始！"):
-        winner = determine_winner(st.session_state.player_hand, st.session_state.computer_hand)
-        st.write(winner)
-        st.session_state.player_hand, st.session_state.computer_hand = reset_game()
+# ゲームの描画と進行
+def game_loop():
+    if st.session_state.game_over:
+        st.write("ゲームオーバー！")
+        st.write(f"スコア: {st.session_state.score}")
+        if st.button("再スタート"):
+            st.session_state.score = 0
+            st.session_state.pacman_pos = [5, 5]
+            st.session_state.game_over = False
+        return
 
-# ゲームの起動
+    # ゲーム画面の描画
+    grid_image = draw_game()
+    st.image(grid_image, caption="パックマン", use_column_width=True)
+    
+    # ユーザー入力を処理
+    direction = None
+    if st.button("上"):
+        direction = 'up'
+    elif st.button("下"):
+        direction = 'down'
+    elif st.button("左"):
+        direction = 'left'
+    elif st.button("右"):
+        direction = 'right'
+    
+    if direction:
+        move_pacman(direction)
+    
+    # 衝突チェック
+    if check_collision():
+        return
+
+    # スコア表示
+    st.session_state.score += 1
+    st.write(f"スコア: {st.session_state.score}")
+    
+    # 少し待機してゲームの動きに遅延をつける
+    time.sleep(0.5)
+
+# ゲーム開始
+def start_game():
+    st.title("パックマン")
+    game_loop()
+
+# アプリの実行
 if __name__ == "__main__":
-    poker_game()
+    start_game()
