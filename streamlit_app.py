@@ -113,3 +113,66 @@ def main():
                 if cell == BLACK:
                     symbol = "●"
                 elif cell == WHITE:
+                    symbol = "○"
+
+                if game_over or turn != BLACK:
+                    # ゲーム終了 or コンピューターの番は押せない
+                    cols[y].button(symbol, disabled=True, key=f"{x}_{y}")
+                else:
+                    # プレイヤーの番で、有効な手のみ押せるボタンにする
+                    if is_valid_move(board, BLACK, x, y):
+                        if cols[y].button(symbol, key=f"{x}_{y}"):
+                            st.session_state.selected_move = (x, y)
+                    else:
+                        cols[y].button(symbol, disabled=True, key=f"disabled_{x}_{y}")
+
+    draw_board()
+    st.write(st.session_state.message)
+
+    if not game_over and turn == BLACK:
+        if 'selected_move' in st.session_state:
+            x, y = st.session_state.selected_move
+            del st.session_state.selected_move
+            if is_valid_move(board, BLACK, x, y):
+                board, _ = make_move(board, BLACK, x, y)
+                st.session_state.board = board
+                st.session_state.turn = WHITE
+                st.session_state.message = "白（○）の番です"
+
+    # コンピューターの簡易AI（ランダム合法手選択）
+    if not game_over and turn == WHITE:
+        valid = valid_moves(board, WHITE)
+        if valid:
+            move = random.choice(valid)
+            board, _ = make_move(board, WHITE, move[0], move[1])
+            st.session_state.board = board
+            st.session_state.turn = BLACK
+            st.session_state.message = "黒（●）の番です"
+        else:
+            # 白はパス
+            st.session_state.turn = BLACK
+            st.session_state.message = "白はパスしました。黒（●）の番です"
+
+    # 両者の合法手がないならゲーム終了
+    if not game_over:
+        black_moves = valid_moves(board, BLACK)
+        white_moves = valid_moves(board, WHITE)
+        if not black_moves and not white_moves:
+            st.session_state.game_over = True
+            blacks, whites = count_pieces(board)
+            if blacks > whites:
+                st.session_state.message = f"ゲーム終了！● 黒の勝ち！({blacks} - {whites})"
+            elif whites > blacks:
+                st.session_state.message = f"ゲーム終了！○ 白の勝ち！({whites} - {blacks})"
+            else:
+                st.session_state.message = f"ゲーム終了！引き分け！({blacks} - {whites})"
+
+    if st.button("リセット"):
+        st.session_state.board = init_board()
+        st.session_state.turn = BLACK
+        st.session_state.game_over = False
+        st.session_state.message = "黒（●）の番です"
+
+
+if __name__ == "__main__":
+    main()
