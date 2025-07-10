@@ -1,79 +1,35 @@
 import streamlit as st
 import random
+import time
 
-# 花の色と種類を定義
-flower_colors = ['赤', '青', '黄色', '白', 'ピンク']
-flower_types = ['バラ', 'チューリップ', 'ヒマワリ', 'カーネーション', 'リリー']
+# 初期化
+if 'score' not in st.session_state:
+    st.session_state.score = 0
+if 'game_over' not in st.session_state:
+    st.session_state.game_over = False
 
-# 花占い結果を定義（色 + 種類に基づくメッセージ）
-def get_fortune(color, flower_type):
-    fortunes = {
-        '赤': {
-            'バラ': '情熱的なあなた。愛に溢れた日々が待っています。',
-            'チューリップ': '積極的なあなた。新しい冒険が始まります。',
-            'ヒマワリ': '明るく前向きなあなた。周りの人を元気づけます。',
-            'カーネーション': '心優しいあなた。周囲の人々に支えられる時です。',
-            'リリー': '誠実なあなた。自分の信念を貫くときです。',
-        },
-        '青': {
-            'バラ': '冷静沈着なあなた。理想の愛が見つかるでしょう。',
-            'チューリップ': '穏やかな心を持つあなた。静かな幸せを感じる時。',
-            'ヒマワリ': '人とのつながりを大切にするあなた。周囲との絆が深まります。',
-            'カーネーション': '優しい心のあなた。思いやりが実を結ぶでしょう。',
-            'リリー': '謙虚なあなた。真の幸せを手に入れる瞬間が近づいています。',
-        },
-        '黄色': {
-            'バラ': '好奇心旺盛なあなた。新しい挑戦が幸運を呼びます。',
-            'チューリップ': '明るくエネルギッシュなあなた。次のステップに進む時です。',
-            'ヒマワリ': '陽気で楽天的なあなた。幸運が舞い込んでくるでしょう。',
-            'カーネーション': '慎重で心優しいあなた。大切な人との絆が強まります。',
-            'リリー': '理知的で冷静なあなた。未来に向けて確実に歩みを進めます。',
-        },
-        '白': {
-            'バラ': '純粋で心優しいあなた。新しい愛の予感があります。',
-            'チューリップ': '穏やかな心を持つあなた。過去の悩みが解消されます。',
-            'ヒマワリ': '楽観的なあなた。喜びと平和な日々が待っています。',
-            'カーネーション': '支え合うことが大切なあなた。周りの人々と協力しましょう。',
-            'リリー': '誠実で真摯なあなた。大切な約束を守ることで幸運を手にします。',
-        },
-        'ピンク': {
-            'バラ': '情熱的な愛を求めるあなた。新しい恋が始まる予感。',
-            'チューリップ': '人間関係において幸運が訪れます。心のままに行動を。',
-            'ヒマワリ': '明るく前向きなあなた。周囲の人々との絆が強くなります。',
-            'カーネーション': '献身的で思いやり深いあなた。支え合う日々が続きます。',
-            'リリー': '冷静かつ理性的なあなた。物事がうまくいくタイミングです。',
-        },
-    }
-    return fortunes.get(color, {}).get(flower_type, "不明な結果です。もう一度選んでください。")
+# ゲームのタイトル
+st.title("釣りゲーム")
 
+# スコア表示
+st.write(f"スコア: {st.session_state.score} 点")
 
-def main():
-    st.title('花占いゲーム 🌸')
-
-    # 花の色と種類の選択肢
-    selected_color = st.selectbox('花の色を選んでください:', flower_colors)
-    selected_flower = st.selectbox('花の種類を選んでください:', flower_types)
-
-    # 占いボタン
-    if st.button('占う'):
-        # 占い結果を取得
-        fortune = get_fortune(selected_color, selected_flower)
-
-        # 結果を表示
-        st.write(f"あなたが選んだ花は {selected_color} の {selected_flower} です。")
-        st.write(f"占い結果: {fortune}")
-
-    # 占いの説明
-    st.write("""
-        花占いでは、花の色と種類によってあなたの未来を占います。 
-        それぞれの色には個性があり、花の種類によって占いの内容が変わります。
-        あなたにぴったりな占い結果が待っていますよ！
-    """)
-
-    # リセットボタン
-    if st.button('リセット'):
-        st.experimental_rerun()
-
-
-if __name__ == "__main__":
-    main()
+# ゲームオーバー時の処理
+if st.session_state.game_over:
+    st.write("ゲームオーバー！再スタートするにはボタンを押してください")
+    if st.button("再スタート"):
+        st.session_state.score = 0
+        st.session_state.game_over = False
+else:
+    # 釣りボタン
+    if st.button("釣りを開始"):
+        with st.spinner("釣ってます..."):
+            time.sleep(2)  # 釣りのアクションをシミュレート
+            fish_caught = random.choice([True, False])
+            
+            if fish_caught:
+                st.session_state.score += 1
+                st.success("おめでとう！魚がかかりました！")
+            else:
+                st.error("残念！魚がかかりませんでした。")
+                st.session_state.game_over = True
