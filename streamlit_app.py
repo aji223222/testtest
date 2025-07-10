@@ -2,119 +2,131 @@ import streamlit as st
 import numpy as np
 import time
 from PIL import Image, ImageDraw
+import random
 
 # ゲームの設定
-GRID_SIZE = 10  # グリッドのサイズ（10x10）
-PACMAN_COLOR = (255, 255, 0)  # パックマンの色（黄色）
-GHOST_COLOR = (255, 0, 0)    # ゴーストの色（赤）
+CAR_WIDTH = 20  # 車の幅
+CAR_HEIGHT = 40  # 車の高さ
+TRACK_WIDTH = 200  # トラックの幅
+TRACK_HEIGHT = 600  # トラックの高さ
+OBSTACLE_WIDTH = 30  # 障害物の幅
+OBSTACLE_HEIGHT = 30  # 障害物の高さ
 
 # 初期化
+if 'car_pos' not in st.session_state:
+    st.session_state.car_pos = [TRACK_WIDTH // 2 - CAR_WIDTH // 2, TRACK_HEIGHT - CAR_HEIGHT - 10]  # 車の初期位置
 if 'score' not in st.session_state:
-    st.session_state.score = 0
-if 'pacman_pos' not in st.session_state:
-    st.session_state.pacman_pos = [5, 5]  # パックマンの初期位置
+    st.session_state.score = 0  # スコア
+if 'obstacles' not in st.session_state:
+    st.session_state.obstacles = []  # 障害物のリスト
 if 'game_over' not in st.session_state:
     st.session_state.game_over = False
 
-# ゲームフィールドの描画
-def draw_game():
-    # ゲームボードのサイズ
-    width, height = 400, 400
-    grid = Image.new('RGB', (width, height), (0, 0, 0))  # 黒い背景
-    draw = ImageDraw.Draw(grid)
-    
-    # グリッド線の描画
-    for i in range(0, width, width // GRID_SIZE):
-        draw.line([(i, 0), (i, height)], fill=(255, 255, 255))
-    for i in range(0, height, height // GRID_SIZE):
-        draw.line([(0, i), (width, i)], fill=(255, 255, 255))
-    
-    # パックマンの描画
-    pacman_x = st.session_state.pacman_pos[0] * (width // GRID_SIZE) + (width // GRID_SIZE) // 2
-    pacman_y = st.session_state.pacman_pos[1] * (height // GRID_SIZE) + (height // GRID_SIZE) // 2
-    draw.ellipse(
-        [(pacman_x - 10, pacman_y - 10), (pacman_x + 10, pacman_y + 10)],
-        fill=PACMAN_COLOR
-    )
+# 車の描画
+def draw_car(draw, car_pos):
+    draw.rectangle([car_pos[0], car_pos[1], car_pos[0] + CAR_WIDTH, car_pos[1] + CAR_HEIGHT], fill="blue")
 
-    # ゴースト（簡易的に1体）の描画
-    ghost_x = 3 * (width // GRID_SIZE) + (width // GRID_SIZE) // 2
-    ghost_y = 3 * (height // GRID_SIZE) + (height // GRID_SIZE) // 2
-    draw.ellipse(
-        [(ghost_x - 10, ghost_y - 10), (ghost_x + 10, ghost_y + 10)],
-        fill=GHOST_COLOR
-    )
-    
-    return grid
+# 障害物の描画
+def draw_obstacles(draw, obstacles):
+    for obs in obstacles:
+        draw.rectangle([obs[0], obs[1], obs[0] + OBSTACLE_WIDTH, obs[1] + OBSTACLE_HEIGHT], fill="red")
 
-# ゲームオーバー処理
+# 障害物の移動
+def move_obstacles():
+    # 障害物を移動させる
+    new_obstacles = []
+    for obs in st.session_state.obstacles:
+        if obs[1] < TRACK_HEIGHT:
+            new_obstacles.append([obs[0], obs[1] + 5])
+    
+    # 新しい障害物を追加
+    if random.random() < 0.05:
+        new_x = random.randint(0, TRACK_WIDTH - OBSTACLE_WIDTH)
+        new_obstacles.append([new_x, 0])
+    
+    st.session_state.obstacles = new_obstacles
+
+# 衝突判定
 def check_collision():
-    pacman_pos = st.session_state.pacman_pos
-    ghost_pos = [3, 3]  # ゴーストの固定位置
-    if pacman_pos == ghost_pos:
-        st.session_state.game_over = True
-        return True
+    car_pos = st.session_state.car_pos
+    for obs in st.session_state.obstacles:
+        if (car_pos[0] < obs[0] + OBSTACLE_WIDTH and
+            car_pos[0] + CAR_WIDTH > obs[0] and
+            car_pos[1] < obs[1] + OBSTACLE_HEIGHT and
+            car_pos[1] + CAR_HEIGHT > obs[1]):
+            return True
     return False
 
-# ユーザー入力（パックマンの移動）
-def move_pacman(direction):
-    if st.session_state.game_over:
-        return
-
-    if direction == 'up':
-        st.session_state.pacman_pos[1] = max(0, st.session_state.pacman_pos[1] - 1)
-    elif direction == 'down':
-        st.session_state.pacman_pos[1] = min(GRID_SIZE - 1, st.session_state.pacman_pos[1] + 1)
-    elif direction == 'left':
-        st.session_state.pacman_pos[0] = max(0, st.session_state.pacman_pos[0] - 1)
+# 車の移動
+def move_car(direction):
+    if direction == 'left':
+        st.session_state.car_pos[0] = max(0, st.session_state.car_pos[0] - 10)
     elif direction == 'right':
-        st.session_state.pacman_pos[0] = min(GRID_SIZE - 1, st.session_state.pacman_pos[0] + 1)
+        st.session_state.car_pos[0] = min(TRACK_WIDTH - CAR_WIDTH, st.session_state.car_pos[0] + 10)
 
-# ゲームの描画と進行
+# ゲーム画面の描画
+def draw_game():
+    # 画面の作成
+    image = Image.new('RGB', (TRACK_WIDTH, TRACK_HEIGHT), (0, 0, 0))  # 黒い背景
+    draw = ImageDraw.Draw(image)
+    
+    # トラックの中央線
+    draw.line([TRACK_WIDTH // 2, 0, TRACK_WIDTH // 2, TRACK_HEIGHT], fill="white", width=2)
+    
+    # 車を描画
+    draw_car(draw, st.session_state.car_pos)
+    
+    # 障害物を描画
+    draw_obstacles(draw, st.session_state.obstacles)
+    
+    return image
+
+# ゲームの進行
 def game_loop():
     if st.session_state.game_over:
         st.write("ゲームオーバー！")
         st.write(f"スコア: {st.session_state.score}")
         if st.button("再スタート"):
+            st.session_state.car_pos = [TRACK_WIDTH // 2 - CAR_WIDTH // 2, TRACK_HEIGHT - CAR_HEIGHT - 10]
             st.session_state.score = 0
-            st.session_state.pacman_pos = [5, 5]
+            st.session_state.obstacles = []
             st.session_state.game_over = False
         return
-
-    # ゲーム画面の描画
-    grid_image = draw_game()
-    st.image(grid_image, caption="パックマン", use_column_width=True)
     
-    # ユーザー入力を処理
+    # ゲームの描画
+    image = draw_game()
+    st.image(image, caption="レースゲーム", use_column_width=True)
+    
+    # 車の移動処理
     direction = None
-    if st.button("上"):
-        direction = 'up'
-    elif st.button("下"):
-        direction = 'down'
-    elif st.button("左"):
+    if st.button("左"):
         direction = 'left'
     elif st.button("右"):
         direction = 'right'
     
     if direction:
-        move_pacman(direction)
+        move_car(direction)
+    
+    # 障害物の移動
+    move_obstacles()
     
     # 衝突チェック
     if check_collision():
+        st.session_state.game_over = True
         return
-
-    # スコア表示
+    
+    # スコア更新
     st.session_state.score += 1
     st.write(f"スコア: {st.session_state.score}")
     
-    # 少し待機してゲームの動きに遅延をつける
-    time.sleep(0.5)
+    # ゲームの進行
+    time.sleep(0.1)
 
-# ゲーム開始
+# ゲームの開始
 def start_game():
-    st.title("パックマン")
+    st.title("レースゲーム")
     game_loop()
 
-# アプリの実行
+# 実行
 if __name__ == "__main__":
     start_game()
