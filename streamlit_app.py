@@ -1,31 +1,32 @@
-# Streamlitライブラリをインポート
 import streamlit as st
+import random
 
-# ページ設定（タブに表示されるタイトル、表示幅）
-st.set_page_config(page_title="タイトル", layout="wide")
+# じゃんけんの手を定義
+choices = ['グー', 'チョキ', 'パー']
 
-# タイトルを設定
-st.title('Yokoo taishi')
-
-# テキスト入力ボックスを作成し、ユーザーからの入力を受け取る
-user_input = st.text_input('あなたの名前を入力してください')
-
-# ボタンを作成し、クリックされたらメッセージを表示
-if st.button('挨拶する'):
-    if user_input:  # 名前が入力されているかチェック
-        st.success(f'🌟 こんにちは、{user_input}さん! 🌟')  # メッセージをハイライト
+# じゃんけんの結果を判定する関数
+def judge(player_choice, computer_choice):
+    if player_choice == computer_choice:
+        return "引き分け"
+    elif (player_choice == 'グー' and computer_choice == 'チョキ') or \
+         (player_choice == 'チョキ' and computer_choice == 'パー') or \
+         (player_choice == 'パー' and computer_choice == 'グー'):
+        return "あなたの勝ち"
     else:
-        st.error('名前を入力してください。')  # エラーメッセージを表示
+        return "コンピューターの勝ち"
 
-# スライダーを作成し、値を選択
-number = st.slider('好きな数字（10進数）を選んでください', 0, 100)
+# StreamlitアプリのUI
+st.title('じゃんけんゲーム')
 
-# 補足メッセージ
-st.caption("十字キー（左右）でも調整できます。")
+# ユーザーに手を選ばせる
+player_choice = st.selectbox('じゃんけんの手を選んでください:', choices)
 
-# 選択した数字を表示
-st.write(f'あなたが選んだ数字は「{number}」です。')
+# コンピューターが手を選ぶ
+computer_choice = random.choice(choices)
 
-# 選択した数値を2進数に変換
-binary_representation = bin(number)[2:]  # 'bin'関数で2進数に変換し、先頭の'0b'を取り除く
-st.info(f'🔢 10進数の「{number}」を2進数で表現すると「{binary_representation}」になります。 🔢')  # 2進数の表示をハイライト
+# ボタンを押したときに結果を表示
+if st.button('じゃんけん！'):
+    result = judge(player_choice, computer_choice)
+    st.write(f'あなたの手: {player_choice}')
+    st.write(f'コンピューターの手: {computer_choice}')
+    st.write(f'結果: {result}')
